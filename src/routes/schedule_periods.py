@@ -25,7 +25,10 @@ async def get_period(period_id: int, db: AsyncSession = Depends(get_db)):
 
 @router.post("", response_model=PeriodResponse, status_code=status.HTTP_201_CREATED)
 async def create_period(body: PeriodCreate, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
-    return await schedule_period_service.create_period(db, body, user.id)
+    try:
+        return await schedule_period_service.create_period(db, body, user.id)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 @router.patch("/{period_id}/activate", response_model=PeriodResponse)
@@ -35,7 +38,10 @@ async def activate_period(period_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Periodo no encontrado")
     if period.status == "active":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El periodo ya esta activo")
-    return await schedule_period_service.activate_period(db, period)
+    try:
+        return await schedule_period_service.activate_period(db, period)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 @router.delete("/{period_id}", status_code=status.HTTP_204_NO_CONTENT)

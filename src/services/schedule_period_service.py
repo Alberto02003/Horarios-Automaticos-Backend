@@ -19,7 +19,21 @@ async def get_period(db: AsyncSession, period_id: int) -> SchedulePeriod | None:
     return result.scalar_one_or_none()
 
 
+async def check_active_exists(db: AsyncSession, year: int, month: int) -> bool:
+    result = await db.execute(
+        select(SchedulePeriod).where(
+            SchedulePeriod.year == year,
+            SchedulePeriod.month == month,
+            SchedulePeriod.status == "active",
+        )
+    )
+    return result.scalar_one_or_none() is not None
+
+
 async def create_period(db: AsyncSession, data: PeriodCreate, user_id: int) -> dict:
+    if await check_active_exists(db, data.year, data.month):
+        raise ValueError(f"Ya existe un periodo activo para {data.month}/{data.year}. Eliminalo primero.")
+
     period = SchedulePeriod(
         name=data.name,
         year=data.year,
@@ -35,6 +49,9 @@ async def create_period(db: AsyncSession, data: PeriodCreate, user_id: int) -> d
 
 
 async def activate_period(db: AsyncSession, period: SchedulePeriod) -> dict:
+    if await check_active_exists(db, period.year, period.month):
+        raise ValueError(f"Ya existe un periodo activo para {period.month}/{period.year}. Eliminalo primero.")
+
     period.status = "active"
     period.activated_at = datetime.now(timezone.utc)
     await db.commit()
