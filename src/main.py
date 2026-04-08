@@ -9,6 +9,7 @@ from src.routes.preferences import router as preferences_router
 from src.routes.schedule_periods import router as periods_router
 from src.routes.assignments import router as assignments_router
 from src.routes.generation import router as generation_router
+from src.routes.export import router as export_router
 import src.models  # noqa: F401 — register models with SQLAlchemy metadata
 
 app = FastAPI(title="Horarios Automaticos API", version="0.1.0")
@@ -28,6 +29,7 @@ app.include_router(preferences_router)
 app.include_router(periods_router)
 app.include_router(assignments_router)
 app.include_router(generation_router)
+app.include_router(export_router)
 
 
 @app.get("/health")
