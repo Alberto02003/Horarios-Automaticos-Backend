@@ -1,9 +1,11 @@
 from datetime import date, datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.schedule_period import SchedulePeriod
+from src.models.schedule_assignment import ScheduleAssignment
+from src.models.generation_run import GenerationRun
 from src.schemas.schedule_period import PeriodCreate
 
 
@@ -38,6 +40,13 @@ async def activate_period(db: AsyncSession, period: SchedulePeriod) -> dict:
     await db.commit()
     await db.refresh(period)
     return _to_dict(period)
+
+
+async def delete_period(db: AsyncSession, period: SchedulePeriod) -> None:
+    await db.execute(delete(GenerationRun).where(GenerationRun.schedule_period_id == period.id))
+    await db.execute(delete(ScheduleAssignment).where(ScheduleAssignment.schedule_period_id == period.id))
+    await db.delete(period)
+    await db.commit()
 
 
 def _to_dict(p: SchedulePeriod) -> dict:

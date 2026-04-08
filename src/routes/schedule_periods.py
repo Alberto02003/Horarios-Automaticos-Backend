@@ -36,3 +36,13 @@ async def activate_period(period_id: int, db: AsyncSession = Depends(get_db)):
     if period.status == "active":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El periodo ya esta activo")
     return await schedule_period_service.activate_period(db, period)
+
+
+@router.delete("/{period_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_period(period_id: int, db: AsyncSession = Depends(get_db)):
+    period = await schedule_period_service.get_period(db, period_id)
+    if not period:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Periodo no encontrado")
+    if period.status == "active":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No se puede eliminar un periodo activo")
+    await schedule_period_service.delete_period(db, period)
