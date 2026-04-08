@@ -11,7 +11,7 @@ RUN useradd -m -u 1001 appuser
 WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
 COPY . .
-RUN chmod +x entrypoint.sh
+RUN chmod +x entrypoint.sh && mkdir -p /app/uploads && chown -R appuser:appuser /app/uploads
 ENV PATH="/app/.venv/bin:$PATH"
 USER appuser
 EXPOSE 8080
