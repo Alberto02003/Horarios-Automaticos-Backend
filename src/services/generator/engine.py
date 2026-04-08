@@ -14,7 +14,7 @@ from src.models.generation_run import GenerationRun
 from src.schemas.assignment import AssignmentCreate
 from src.services import assignment_service
 
-from .base import GenerationContext, MemberInfo, ShiftInfo, ExistingAssignment
+from .base import GenerationContext, MemberInfo, ShiftInfo, ExistingAssignment, compute_shift_hours
 from .balanced import BalancedStrategy
 from .coverage import CoverageStrategy
 from .conservative import ConservativeStrategy
@@ -49,10 +49,18 @@ async def run_generation(
     # Load shift types
     shifts_result = await db.execute(select(ShiftType).where(ShiftType.is_active.is_(True)))
     all_shifts = list(shifts_result.scalars().all())
-    work_shifts = [
-        ShiftInfo(id=s.id, code=s.code, category=s.category, start_time=s.default_start_time, end_time=s.default_end_time, counts_as_work_time=True)
-        for s in all_shifts if s.counts_as_work_time
-    ]
+    all_shifts_map: dict[int, ShiftInfo] = {}
+    work_shifts: list[ShiftInfo] = []
+    for s in all_shifts:
+        si = ShiftInfo(
+            id=s.id, code=s.code, category=s.category,
+            start_time=s.default_start_time, end_time=s.default_end_time,
+            counts_as_work_time=s.counts_as_work_time,
+            hours=compute_shift_hours(s.default_start_time, s.default_end_time),
+        )
+        all_shifts_map[s.id] = si
+        if s.counts_as_work_time:
+            work_shifts.append(si)
     rest_shift = next((s for s in all_shifts if s.code == "D"), None)
 
     # Load existing assignments
@@ -81,12 +89,14 @@ async def run_generation(
     ctx = GenerationContext(
         members=members,
         work_shifts=work_shifts,
+        all_shifts=all_shifts_map,
         rest_shift_id=rest_shift.id if rest_shift else None,
         existing=existing,
         dates=dates,
         weekly_hour_limit=float(prefs.general_weekly_hour_limit) if prefs else 40.0,
         max_consecutive_days=pref_json.get("max_consecutive_days", 6),
         min_rest_hours=pref_json.get("min_rest_hours", 12),
+        allow_weekend_work=pref_json.get("allow_weekend_work", True),
         fill_unassigned_only=fill_unassigned_only,
     )
 
