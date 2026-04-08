@@ -4,6 +4,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.core.config import settings
 from src.routes.auth import router as auth_router
 from src.routes.members import router as members_router
+from src.routes.shift_types import router as shift_types_router
+from src.routes.preferences import router as preferences_router
 import src.models  # noqa: F401 — register models with SQLAlchemy metadata
 
 app = FastAPI(title="Horarios Automaticos API", version="0.1.0")
@@ -18,6 +20,8 @@ app.add_middleware(
 
 app.include_router(auth_router)
 app.include_router(members_router)
+app.include_router(shift_types_router)
+app.include_router(preferences_router)
 
 
 @app.get("/health")
