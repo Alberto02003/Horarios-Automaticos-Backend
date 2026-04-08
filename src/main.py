@@ -1,5 +1,8 @@
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from src.core.config import settings
 from src.routes.auth import router as auth_router
@@ -30,6 +33,11 @@ app.include_router(periods_router)
 app.include_router(assignments_router)
 app.include_router(generation_router)
 app.include_router(export_router)
+
+# Serve uploaded files
+uploads_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")
+os.makedirs(uploads_dir, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
 
 @app.get("/health")

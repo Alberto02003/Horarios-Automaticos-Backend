@@ -15,4 +15,5 @@ class UserResponse(BaseModel):
     id: int
     email: str
     display_name: str
+    avatar_url: str | None = None
     is_active: bool
