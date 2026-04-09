@@ -54,14 +54,27 @@ class CoverageStrategy(GenerationStrategy):
                         assigned[key] = ctx.rest_shift_id
                     continue
 
-                # Pick shift with least coverage that day
+                # Pick shift: prefer under-min coverage, exclude over-max, then least assigned
                 shift_counts: dict[int, int] = defaultdict(int)
                 for m in ctx.members:
                     existing_shift = assigned.get((m.id, d))
                     if existing_shift:
                         shift_counts[existing_shift] += 1
 
-                best_shift = min(ctx.work_shifts, key=lambda s: shift_counts.get(s.id, 0))
+                eligible = ctx.work_shifts
+                if ctx.shift_coverage:
+                    eligible = [s for s in eligible if not ctx.shift_coverage.get(s.id) or shift_counts.get(s.id, 0) < ctx.shift_coverage[s.id].max]
+                    needs = [s for s in eligible if ctx.shift_coverage.get(s.id) and shift_counts.get(s.id, 0) < ctx.shift_coverage[s.id].min]
+                    if needs:
+                        eligible = needs
+
+                if not eligible:
+                    if ctx.rest_shift_id and key not in assigned:
+                        proposals.append(ProposedAssignment(member.id, d, ctx.rest_shift_id))
+                        assigned[key] = ctx.rest_shift_id
+                    continue
+
+                best_shift = min(eligible, key=lambda s: shift_counts.get(s.id, 0))
 
                 proposals.append(ProposedAssignment(member.id, d, best_shift.id))
                 assigned[key] = best_shift.id

@@ -14,7 +14,7 @@ from src.models.generation_run import GenerationRun
 from src.schemas.assignment import AssignmentCreate
 from src.services import assignment_service
 
-from .base import GenerationContext, MemberInfo, ShiftInfo, ExistingAssignment, compute_shift_hours
+from .base import GenerationContext, MemberInfo, ShiftInfo, ShiftCoverage, ExistingAssignment, compute_shift_hours
 from .balanced import BalancedStrategy
 from .coverage import CoverageStrategy
 from .conservative import ConservativeStrategy
@@ -98,6 +98,10 @@ async def run_generation(
         min_rest_hours=pref_json.get("min_rest_hours", 12),
         allow_weekend_work=pref_json.get("allow_weekend_work", True),
         fill_unassigned_only=fill_unassigned_only,
+        shift_coverage={
+            int(k): ShiftCoverage(min=v.get("min", 0), max=v.get("max", 99))
+            for k, v in (pref_json.get("shift_coverage") or {}).items()
+        },
     )
 
     # Run strategy

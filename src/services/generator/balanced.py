@@ -1,4 +1,4 @@
-"""Balanced strategy: distributes shifts evenly across members, respecting all constraints."""
+"""Balanced strategy: distributes shifts evenly, respects coverage min/max and all constraints."""
 
 from collections import defaultdict
 from datetime import date
@@ -16,8 +16,10 @@ class BalancedStrategy(GenerationStrategy):
         member_hours: dict[int, float] = defaultdict(float)
         member_consecutive: dict[int, int] = defaultdict(int)
         member_last_work: dict[int, date | None] = {m.id: None for m in ctx.members}
-        # Track last shift end time for rest hours check
         member_last_shift_id: dict[int, int | None] = {m.id: None for m in ctx.members}
+
+        # Track shift counts per day for coverage
+        day_shift_count: dict[tuple[date, int], int] = defaultdict(int)  # (date, shift_id) -> count
 
         for ex in ctx.existing:
             assigned[(ex.member_id, ex.date)] = ex.shift_type_id
@@ -28,15 +30,7 @@ class BalancedStrategy(GenerationStrategy):
                 member_hours[ex.member_id] += st.hours
                 member_last_work[ex.member_id] = ex.date
                 member_last_shift_id[ex.member_id] = ex.shift_type_id
-
-        # Pre-compute consecutive days from existing
-        sorted_existing: dict[int, list[date]] = defaultdict(list)
-        for ex in ctx.existing:
-            st = ctx.all_shifts.get(ex.shift_type_id)
-            if st and st.counts_as_work_time:
-                sorted_existing[ex.member_id].append(ex.date)
-        for mid in sorted_existing:
-            sorted_existing[mid].sort()
+                day_shift_count[(ex.date, ex.shift_type_id)] += 1
 
         proposals: list[ProposedAssignment] = []
         total_days = len(ctx.dates)
@@ -44,7 +38,6 @@ class BalancedStrategy(GenerationStrategy):
 
         for d in ctx.dates:
             is_weekend = d.weekday() >= 5
-
             sorted_members = sorted(ctx.members, key=lambda m: member_hours[m.id])
 
             for member in sorted_members:
@@ -86,12 +79,11 @@ class BalancedStrategy(GenerationStrategy):
                     member_last_work[member.id] = None
                     continue
 
-                # Check min rest hours between shifts
+                # Check min rest hours
                 last_shift = member_last_shift_id.get(member.id)
                 if last_shift and last and (d - last).days == 1:
                     prev_st = ctx.all_shifts.get(last_shift)
                     if prev_st and prev_st.end_time:
-                        # Filter out shifts that don't give enough rest
                         eligible = [s for s in ctx.work_shifts if _rest_ok(prev_st.end_time, s.start_time, ctx.min_rest_hours)]
                         if not eligible:
                             if ctx.rest_shift_id and key not in assigned:
@@ -103,7 +95,21 @@ class BalancedStrategy(GenerationStrategy):
                 else:
                     eligible = ctx.work_shifts
 
-                # Pick shift: rotate for balance
+                # Filter by coverage max — exclude shifts that already hit max for this day
+                if ctx.shift_coverage:
+                    eligible = [s for s in eligible if _under_max(ctx, d, s.id, day_shift_count)]
+                    if not eligible:
+                        if ctx.rest_shift_id and key not in assigned:
+                            proposals.append(ProposedAssignment(member.id, d, ctx.rest_shift_id))
+                            assigned[key] = ctx.rest_shift_id
+                        continue
+
+                # Pick shift: prefer shifts that need more coverage (under min), then rotate for balance
+                if ctx.shift_coverage:
+                    needs_coverage = [s for s in eligible if _under_min(ctx, d, s.id, day_shift_count)]
+                    if needs_coverage:
+                        eligible = needs_coverage
+
                 shift_idx = hash((member.id, d.toordinal())) % len(eligible)
                 shift = eligible[shift_idx]
 
@@ -112,17 +118,30 @@ class BalancedStrategy(GenerationStrategy):
                 member_hours[member.id] += shift.hours
                 member_last_work[member.id] = d
                 member_last_shift_id[member.id] = shift.id
+                day_shift_count[(d, shift.id)] += 1
 
         return proposals
 
 
 def _rest_ok(prev_end: "time", next_start: "time | None", min_rest: int) -> bool:
-    """Check if there are enough rest hours between shifts."""
     if not next_start:
         return True
     from datetime import timedelta
     end = timedelta(hours=prev_end.hour, minutes=prev_end.minute)
     start = timedelta(hours=next_start.hour, minutes=next_start.minute)
-    # Next day start
     rest = (timedelta(hours=24) - end) + start
     return rest.total_seconds() / 3600 >= min_rest
+
+
+def _under_max(ctx: GenerationContext, d: date, shift_id: int, counts: dict) -> bool:
+    cov = ctx.shift_coverage.get(shift_id)
+    if not cov:
+        return True
+    return counts.get((d, shift_id), 0) < cov.max
+
+
+def _under_min(ctx: GenerationContext, d: date, shift_id: int, counts: dict) -> bool:
+    cov = ctx.shift_coverage.get(shift_id)
+    if not cov:
+        return False
+    return counts.get((d, shift_id), 0) < cov.min

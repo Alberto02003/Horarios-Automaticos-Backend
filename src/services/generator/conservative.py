@@ -66,8 +66,29 @@ class ConservativeStrategy(GenerationStrategy):
                     member_last_work[member.id] = None
                     continue
 
-                shift_idx = hash((member.id, d.toordinal())) % len(ctx.work_shifts)
-                shift = ctx.work_shifts[shift_idx]
+                # Filter by coverage constraints
+                eligible = ctx.work_shifts
+                if ctx.shift_coverage:
+                    day_counts: dict[int, int] = defaultdict(int)
+                    for ex in ctx.existing:
+                        if ex.date == d:
+                            day_counts[ex.shift_type_id] += 1
+                    for p in proposals:
+                        if p.date == d:
+                            day_counts[p.shift_type_id] += 1
+
+                    eligible = [s for s in eligible if not ctx.shift_coverage.get(s.id) or day_counts.get(s.id, 0) < ctx.shift_coverage[s.id].max]
+                    needs = [s for s in eligible if ctx.shift_coverage.get(s.id) and day_counts.get(s.id, 0) < ctx.shift_coverage[s.id].min]
+                    if needs:
+                        eligible = needs
+
+                if not eligible:
+                    if ctx.rest_shift_id:
+                        proposals.append(ProposedAssignment(member.id, d, ctx.rest_shift_id))
+                    continue
+
+                shift_idx = hash((member.id, d.toordinal())) % len(eligible)
+                shift = eligible[shift_idx]
 
                 proposals.append(ProposedAssignment(member.id, d, shift.id))
                 assigned.add(key)

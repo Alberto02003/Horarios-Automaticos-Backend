@@ -37,6 +37,12 @@ class ProposedAssignment:
 
 
 @dataclass
+class ShiftCoverage:
+    min: int
+    max: int
+
+
+@dataclass
 class GenerationContext:
     members: list[MemberInfo]
     work_shifts: list[ShiftInfo]
@@ -49,6 +55,7 @@ class GenerationContext:
     min_rest_hours: int
     allow_weekend_work: bool
     fill_unassigned_only: bool
+    shift_coverage: dict[int, ShiftCoverage]  # shift_type_id -> min/max per day
 
 
 def compute_shift_hours(start: time | None, end: time | None) -> float:
