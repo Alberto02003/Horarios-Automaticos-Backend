@@ -16,8 +16,9 @@ async def test_login_success(client, seed_user):
     assert res.status_code == 200
     data = res.json()
     assert "access_token" in data
-    assert "refresh_token" in data
     assert data["token_type"] == "bearer"
+    # refresh_token is now in httpOnly cookie
+    assert "refresh_token" in res.cookies
 
 
 @pytest.mark.asyncio
