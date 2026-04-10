@@ -26,7 +26,7 @@ async def test_update_preferences(auth_client):
 async def test_generate_balanced(auth_client):
     # Setup: period + member + shift type
     period = await auth_client.post("/api/schedule-periods", json={"name": "Gen", "year": 2026, "month": 11, "start_date": "2026-11-01", "end_date": "2026-11-30"})
-    await auth_client.post("/api/members", json={"full_name": "Worker", "role_name": "R", "weekly_hour_limit": 40, "color_tag": "#F00"})
+    await auth_client.post("/api/members", json={"full_name": "Worker", "role_name": "Role", "weekly_hour_limit": 40, "color_tag": "#F472B6"})
     await auth_client.post("/api/shift-types", json={"code": "M", "name": "Manana", "category": "work", "default_start_time": "07:00", "default_end_time": "15:00", "color": "#3B82F6"})
     await auth_client.post("/api/shift-types", json={"code": "D", "name": "Descanso", "category": "special", "color": "#10B981", "counts_as_work_time": False})
 

@@ -1,4 +1,4 @@
-"""Test fixtures: PostgreSQL DB with transaction rollback per test."""
+"""Test fixtures: PostgreSQL with cleanup per test."""
 
 import asyncio
 import os
@@ -7,6 +7,7 @@ import platform
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from src.core.database import Base, get_db
@@ -30,6 +31,27 @@ async def override_get_db():
 
 app.dependency_overrides[get_db] = override_get_db
 
+# Tables to clean (in order to respect FK constraints)
+TABLES_TO_CLEAN = [
+    "generation_runs",
+    "schedule_assignments",
+    "schedule_periods",
+    "member_generation_preferences",
+    "generation_preferences",
+    "shift_types",
+    "department_members",
+    "users",
+]
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def cleanup_db():
+    """Clean all data after each test."""
+    yield
+    async with engine.begin() as conn:
+        for table in TABLES_TO_CLEAN:
+            await conn.execute(text(f"DELETE FROM {table}"))
+
 
 @pytest_asyncio.fixture
 async def db():
@@ -43,10 +65,7 @@ async def seed_user(db: AsyncSession):
     db.add(user)
     await db.commit()
     await db.refresh(user)
-    yield user
-    # Cleanup
-    await db.delete(user)
-    await db.commit()
+    return user
 
 
 @pytest_asyncio.fixture

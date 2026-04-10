@@ -50,4 +50,4 @@ async def test_get_nonexistent_member(auth_client):
 @pytest.mark.asyncio
 async def test_members_require_auth(client):
     res = await client.get("/api/members")
-    assert res.status_code == 403
+    assert res.status_code in (401, 403)

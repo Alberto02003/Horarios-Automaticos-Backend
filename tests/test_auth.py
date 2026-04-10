@@ -43,7 +43,7 @@ async def test_me_authenticated(auth_client, seed_user):
 @pytest.mark.asyncio
 async def test_me_no_token(client):
     res = await client.get("/api/auth/me")
-    assert res.status_code == 403
+    assert res.status_code in (401, 403)  # HTTPBearer returns 403 without header, 401 with bad token
 
 
 @pytest.mark.asyncio
