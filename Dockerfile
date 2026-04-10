@@ -14,7 +14,5 @@ COPY . .
 RUN chmod +x entrypoint.sh && mkdir -p /app/uploads && chown -R appuser:appuser /app/uploads
 ENV PATH="/app/.venv/bin:$PATH"
 USER appuser
-EXPOSE ${PORT:-8080}
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD python -c "import os,urllib.request; urllib.request.urlopen(f'http://localhost:{os.environ.get(\"PORT\",8080)}/health')" || exit 1
+EXPOSE 8080
 CMD ["./entrypoint.sh"]
