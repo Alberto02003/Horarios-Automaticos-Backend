@@ -1,6 +1,6 @@
 from datetime import date, datetime, time
 
-from sqlalchemy import BigInteger, Boolean, CheckConstraint, Date, DateTime, Identity, Index, Text, Time, UniqueConstraint, func
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, Date, DateTime, ForeignKey, Identity, Index, Text, Time, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -11,10 +11,10 @@ class ScheduleAssignment(Base):
     __tablename__ = "schedule_assignments"
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
-    schedule_period_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    member_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    schedule_period_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("schedule_periods.id", ondelete="CASCADE"), nullable=False)
+    member_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("department_members.id"), nullable=False)
     date: Mapped[date] = mapped_column(Date, nullable=False)
-    shift_type_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    shift_type_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("shift_types.id"), nullable=False)
     start_time: Mapped[time | None] = mapped_column(Time)
     end_time: Mapped[time | None] = mapped_column(Time)
     assignment_source: Mapped[str] = mapped_column(Text, nullable=False, server_default="'manual'")

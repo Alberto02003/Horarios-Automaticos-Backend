@@ -21,6 +21,16 @@ class AssignmentBulkCreate(BaseModel):
     assignments: list[AssignmentCreate]
 
 
+class AssignmentBulkUpdate(BaseModel):
+    ids: list[int]
+    shift_type_id: int | None = None
+    is_locked: bool | None = None
+
+
+class AssignmentBulkDelete(BaseModel):
+    ids: list[int]
+
+
 class AssignmentResponse(BaseModel):
     id: int
     schedule_period_id: int

@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db
 from src.core.deps import get_current_user
-from src.schemas.assignment import AssignmentCreate, AssignmentBulkCreate, AssignmentResponse, AssignmentUpdate
+from src.schemas.assignment import AssignmentCreate, AssignmentBulkCreate, AssignmentBulkUpdate, AssignmentBulkDelete, AssignmentResponse, AssignmentUpdate
 from src.services import assignment_service, validation_service
 
 router = APIRouter(prefix="/api/schedule-periods/{period_id}", tags=["assignments"], dependencies=[Depends(get_current_user)])
@@ -22,6 +22,17 @@ async def create_assignment(period_id: int, body: AssignmentCreate, db: AsyncSes
 @router.post("/assignments/bulk", response_model=list[AssignmentResponse])
 async def bulk_create(period_id: int, body: AssignmentBulkCreate, db: AsyncSession = Depends(get_db)):
     return await assignment_service.bulk_create_assignments(db, period_id, body.assignments)
+
+
+@router.put("/assignments/bulk", response_model=list[AssignmentResponse])
+async def bulk_update(period_id: int, body: AssignmentBulkUpdate, db: AsyncSession = Depends(get_db)):
+    return await assignment_service.bulk_update_assignments(db, period_id, body.ids, body.shift_type_id, body.is_locked)
+
+
+@router.delete("/assignments/bulk")
+async def bulk_delete(period_id: int, body: AssignmentBulkDelete, db: AsyncSession = Depends(get_db)):
+    count = await assignment_service.bulk_delete_assignments(db, period_id, body.ids)
+    return {"deleted": count}
 
 
 @router.put("/assignments/{assignment_id}", response_model=AssignmentResponse)

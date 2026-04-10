@@ -107,3 +107,36 @@ async def update_assignment(db: AsyncSession, assignment: ScheduleAssignment, da
 async def delete_assignment(db: AsyncSession, assignment: ScheduleAssignment) -> None:
     await db.delete(assignment)
     await db.commit()
+
+
+async def bulk_update_assignments(db: AsyncSession, period_id: int, ids: list[int], shift_type_id: int | None, is_locked: bool | None) -> list[dict]:
+    result = await db.execute(
+        select(ScheduleAssignment).where(
+            ScheduleAssignment.id.in_(ids),
+            ScheduleAssignment.schedule_period_id == period_id,
+        )
+    )
+    assignments = result.scalars().all()
+    for a in assignments:
+        if shift_type_id is not None:
+            if not a.is_locked:
+                a.shift_type_id = shift_type_id
+        if is_locked is not None:
+            a.is_locked = is_locked
+    await db.commit()
+    return [_to_dict(a) for a in assignments]
+
+
+async def bulk_delete_assignments(db: AsyncSession, period_id: int, ids: list[int]) -> int:
+    result = await db.execute(
+        select(ScheduleAssignment).where(
+            ScheduleAssignment.id.in_(ids),
+            ScheduleAssignment.schedule_period_id == period_id,
+            ScheduleAssignment.is_locked.is_(False),
+        )
+    )
+    assignments = result.scalars().all()
+    for a in assignments:
+        await db.delete(a)
+    await db.commit()
+    return len(assignments)

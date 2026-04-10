@@ -17,5 +17,6 @@ class PeriodResponse(BaseModel):
     start_date: str
     end_date: str
     status: str
+    is_active: bool
     activated_at: str | None = None
     created_at: str

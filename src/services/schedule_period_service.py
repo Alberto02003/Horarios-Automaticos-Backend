@@ -1,18 +1,19 @@
 from datetime import date, datetime, timezone
 
-from sqlalchemy import select, delete, func
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.schedule_period import SchedulePeriod
-from src.models.schedule_assignment import ScheduleAssignment
-from src.models.generation_run import GenerationRun
 from src.schemas.schedule_period import PeriodCreate
 
 
-async def list_periods(db: AsyncSession, offset: int = 0, limit: int = 50) -> tuple[list[dict], int]:
-    count_result = await db.execute(select(func.count()).select_from(SchedulePeriod))
+async def list_periods(db: AsyncSession, offset: int = 0, limit: int = 50, include_inactive: bool = False) -> tuple[list[dict], int]:
+    base = select(SchedulePeriod)
+    if not include_inactive:
+        base = base.where(SchedulePeriod.is_active.is_(True))
+    count_result = await db.execute(select(func.count()).select_from(base.subquery()))
     total = count_result.scalar() or 0
-    result = await db.execute(select(SchedulePeriod).order_by(SchedulePeriod.year.desc(), SchedulePeriod.month.desc()).offset(offset).limit(limit))
+    result = await db.execute(base.order_by(SchedulePeriod.year.desc(), SchedulePeriod.month.desc()).offset(offset).limit(limit))
     return [_to_dict(p) for p in result.scalars().all()], total
 
 
@@ -27,6 +28,7 @@ async def check_active_exists(db: AsyncSession, year: int, month: int) -> bool:
             SchedulePeriod.year == year,
             SchedulePeriod.month == month,
             SchedulePeriod.status == "active",
+            SchedulePeriod.is_active.is_(True),
         )
     )
     return result.scalar_one_or_none() is not None
@@ -61,11 +63,12 @@ async def activate_period(db: AsyncSession, period: SchedulePeriod) -> dict:
     return _to_dict(period)
 
 
-async def delete_period(db: AsyncSession, period: SchedulePeriod) -> None:
-    await db.execute(delete(GenerationRun).where(GenerationRun.schedule_period_id == period.id))
-    await db.execute(delete(ScheduleAssignment).where(ScheduleAssignment.schedule_period_id == period.id))
-    await db.delete(period)
+async def delete_period(db: AsyncSession, period: SchedulePeriod) -> dict:
+    period.is_active = False
+    period.status = "draft"
     await db.commit()
+    await db.refresh(period)
+    return _to_dict(period)
 
 
 def _to_dict(p: SchedulePeriod) -> dict:
@@ -77,6 +80,7 @@ def _to_dict(p: SchedulePeriod) -> dict:
         "start_date": p.start_date.isoformat(),
         "end_date": p.end_date.isoformat(),
         "status": p.status,
+        "is_active": p.is_active,
         "activated_at": p.activated_at.isoformat() if p.activated_at else None,
         "created_at": p.created_at.isoformat() if p.created_at else None,
     }
