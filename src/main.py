@@ -34,6 +34,11 @@ app = FastAPI(title="Horarios Automaticos API", version="0.1.0", lifespan=lifesp
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+# Redirect HTTP → HTTPS when behind a proxy (X-Forwarded-Proto header)
+if settings.FORCE_HTTPS:
+    from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
+    app.add_middleware(HTTPSRedirectMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
