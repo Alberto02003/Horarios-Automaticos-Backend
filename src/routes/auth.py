@@ -2,8 +2,10 @@ import os
 import uuid
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, status
 from sqlalchemy import select
+
+from src.core.rate_limit import limiter
 
 log = logging.getLogger("horarios.auth")
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,7 +22,8 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit("10/minute")
+async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.email == body.email))
     user = result.scalar_one_or_none()
 
@@ -40,7 +43,9 @@ async def me(user: User = Depends(get_current_user)):
 
 
 @router.post("/avatar", response_model=UserResponse)
+@limiter.limit("10/minute")
 async def upload_avatar(
+    request: Request,
     file: UploadFile = File(...),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

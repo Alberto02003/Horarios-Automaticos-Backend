@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db
+from src.core.rate_limit import limiter
 from src.core.deps import get_current_user
 from src.models.user import User
 from src.schemas.generation import GenerationRequest, GenerationResponse, GenerationRunResponse
@@ -12,7 +13,9 @@ router = APIRouter(prefix="/api/schedule-periods/{period_id}", tags=["generation
 
 
 @router.post("/generate", response_model=GenerationResponse)
+@limiter.limit("5/minute")
 async def generate(
+    request: Request,
     period_id: int,
     body: GenerationRequest,
     db: AsyncSession = Depends(get_db),
