@@ -1,6 +1,6 @@
 from datetime import date, time
 
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.schedule_assignment import ScheduleAssignment

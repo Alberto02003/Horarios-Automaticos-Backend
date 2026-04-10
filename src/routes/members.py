@@ -5,17 +5,20 @@ from src.core.database import get_db
 from src.core.deps import get_current_user
 from src.models.user import User
 from src.schemas.member import MemberCreate, MemberResponse, MemberUpdate
+from src.schemas.pagination import PaginatedResponse, PaginationParams
 from src.services import member_service
 
 router = APIRouter(prefix="/api/members", tags=["members"], dependencies=[Depends(get_current_user)])
 
 
-@router.get("", response_model=list[MemberResponse])
+@router.get("", response_model=PaginatedResponse[MemberResponse])
 async def list_members(
     include_inactive: bool = Query(False),
+    pagination: PaginationParams = Depends(),
     db: AsyncSession = Depends(get_db),
 ):
-    return await member_service.list_members(db, include_inactive)
+    items, total = await member_service.list_members(db, include_inactive, pagination.offset, pagination.page_size)
+    return PaginatedResponse(items=items, total=total, page=pagination.page, page_size=pagination.page_size, pages=(total + pagination.page_size - 1) // pagination.page_size)
 
 
 @router.get("/{member_id}", response_model=MemberResponse)

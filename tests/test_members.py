@@ -20,7 +20,9 @@ async def test_list_members(auth_client):
     await auth_client.post("/api/members", json={"full_name": "B", "role_name": "R", "weekly_hour_limit": 35, "color_tag": "#818CF8"})
     res = await auth_client.get("/api/members")
     assert res.status_code == 200
-    assert len(res.json()) == 2
+    data = res.json()
+    assert data["total"] == 2
+    assert len(data["items"]) == 2
 
 
 @pytest.mark.asyncio

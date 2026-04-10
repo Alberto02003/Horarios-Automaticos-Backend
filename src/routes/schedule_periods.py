@@ -5,14 +5,16 @@ from src.core.database import get_db
 from src.core.deps import get_current_user
 from src.models.user import User
 from src.schemas.schedule_period import PeriodCreate, PeriodResponse
+from src.schemas.pagination import PaginatedResponse, PaginationParams
 from src.services import schedule_period_service
 
 router = APIRouter(prefix="/api/schedule-periods", tags=["schedule-periods"], dependencies=[Depends(get_current_user)])
 
 
-@router.get("", response_model=list[PeriodResponse])
-async def list_periods(db: AsyncSession = Depends(get_db)):
-    return await schedule_period_service.list_periods(db)
+@router.get("", response_model=PaginatedResponse[PeriodResponse])
+async def list_periods(pagination: PaginationParams = Depends(), db: AsyncSession = Depends(get_db)):
+    items, total = await schedule_period_service.list_periods(db, pagination.offset, pagination.page_size)
+    return PaginatedResponse(items=items, total=total, page=pagination.page, page_size=pagination.page_size, pages=max(1, (total + pagination.page_size - 1) // pagination.page_size))
 
 
 @router.get("/{period_id}", response_model=PeriodResponse)

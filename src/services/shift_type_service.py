@@ -1,6 +1,6 @@
 from datetime import time
 
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.shift_type import ShiftType
@@ -20,12 +20,15 @@ def _format_time(value: time | None) -> str | None:
     return value.strftime("%H:%M")
 
 
-async def list_shift_types(db: AsyncSession, include_inactive: bool = False) -> list[dict]:
-    query = select(ShiftType).order_by(ShiftType.code)
+async def list_shift_types(db: AsyncSession, include_inactive: bool = False, offset: int = 0, limit: int = 50) -> tuple[list[dict], int]:
+    base = select(ShiftType)
     if not include_inactive:
-        query = query.where(ShiftType.is_active.is_(True))
+        base = base.where(ShiftType.is_active.is_(True))
+    count_result = await db.execute(select(func.count()).select_from(base.subquery()))
+    total = count_result.scalar() or 0
+    query = base.order_by(ShiftType.code).offset(offset).limit(limit)
     result = await db.execute(query)
-    return [_to_dict(st) for st in result.scalars().all()]
+    return [_to_dict(st) for st in result.scalars().all()], total
 
 
 async def get_shift_type(db: AsyncSession, shift_type_id: int) -> ShiftType | None:

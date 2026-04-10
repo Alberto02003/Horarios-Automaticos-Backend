@@ -1,6 +1,6 @@
 from datetime import date, datetime, timezone
 
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.schedule_period import SchedulePeriod
@@ -9,9 +9,11 @@ from src.models.generation_run import GenerationRun
 from src.schemas.schedule_period import PeriodCreate
 
 
-async def list_periods(db: AsyncSession) -> list[dict]:
-    result = await db.execute(select(SchedulePeriod).order_by(SchedulePeriod.year.desc(), SchedulePeriod.month.desc()))
-    return [_to_dict(p) for p in result.scalars().all()]
+async def list_periods(db: AsyncSession, offset: int = 0, limit: int = 50) -> tuple[list[dict], int]:
+    count_result = await db.execute(select(func.count()).select_from(SchedulePeriod))
+    total = count_result.scalar() or 0
+    result = await db.execute(select(SchedulePeriod).order_by(SchedulePeriod.year.desc(), SchedulePeriod.month.desc()).offset(offset).limit(limit))
+    return [_to_dict(p) for p in result.scalars().all()], total
 
 
 async def get_period(db: AsyncSession, period_id: int) -> SchedulePeriod | None:

@@ -21,7 +21,9 @@ async def test_list_shift_types(auth_client):
     await auth_client.post("/api/shift-types", json={"code": "T", "name": "Tarde", "category": "work", "color": "#F59E0B"})
     res = await auth_client.get("/api/shift-types")
     assert res.status_code == 200
-    assert len(res.json()) == 2
+    data = res.json()
+    assert data["total"] == 2
+    assert len(data["items"]) == 2
 
 
 @pytest.mark.asyncio
