@@ -12,9 +12,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db
 from src.core.deps import get_current_user
-from src.core.security import create_access_token, verify_password
+from src.core.security import create_access_token, create_refresh_token, decode_refresh_token, verify_password
 from src.models.user import User
-from src.schemas.auth import LoginRequest, TokenResponse, UserResponse
+from src.schemas.auth import LoginRequest, RefreshRequest, TokenResponse, UserResponse
 
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploads", "avatars")
 
@@ -34,7 +34,21 @@ async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Usuario desactivado")
 
     log.info("Login successful: user_id=%d email=%s", user.id, user.email)
-    return TokenResponse(access_token=create_access_token(user.id))
+    return TokenResponse(access_token=create_access_token(user.id), refresh_token=create_refresh_token(user.id))
+
+
+@router.post("/refresh", response_model=TokenResponse)
+@limiter.limit("20/minute")
+async def refresh(request: Request, body: RefreshRequest, db: AsyncSession = Depends(get_db)):
+    user_id = decode_refresh_token(body.refresh_token)
+    if user_id is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token invalido o expirado")
+    result = await db.execute(select(User).where(User.id == user_id, User.is_active.is_(True)))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario no encontrado")
+    log.info("Token refreshed: user_id=%d", user.id)
+    return TokenResponse(access_token=create_access_token(user.id), refresh_token=create_refresh_token(user.id))
 
 
 @router.get("/me", response_model=UserResponse)
