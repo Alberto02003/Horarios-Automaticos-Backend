@@ -1,8 +1,12 @@
 """Seed script: creates default user, shift types, and generation preferences."""
 
 import asyncio
+import logging
 import platform
 from datetime import time
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)-7s | %(message)s")
+log = logging.getLogger("horarios.seed")
 
 import bcrypt
 from sqlalchemy import select
@@ -36,23 +40,23 @@ async def seed(session: AsyncSession) -> None:
             password_hash=hash_password("admin123"),
             display_name="Jeny",
         ))
-        print("Created user: jeny@horarios.app / admin123")
+        log.info("Created user: jeny@horarios.app / admin123")
 
     # Shift types
     for st in SHIFT_TYPES:
         result = await session.execute(select(ShiftType).where(ShiftType.code == st["code"]))
         if not result.scalar_one_or_none():
             session.add(ShiftType(**st))
-            print(f"Created shift type: {st['code']} - {st['name']}")
+            log.info(f"Created shift type: {st['code']} - {st['name']}")
 
     # Generation preferences (singleton)
     result = await session.execute(select(GenerationPreference))
     if not result.scalar_one_or_none():
         session.add(GenerationPreference(general_weekly_hour_limit=40.0))
-        print("Created default generation preferences (40h/week)")
+        log.info("Created default generation preferences (40h/week)")
 
     await session.commit()
-    print("Seed complete.")
+    log.info("Seed complete.")
 
 
 async def main() -> None:

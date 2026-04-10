@@ -1,8 +1,11 @@
 import os
 import uuid
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from sqlalchemy import select
+
+log = logging.getLogger("horarios.auth")
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db
@@ -27,6 +30,7 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Usuario desactivado")
 
+    log.info("Login successful: user_id=%d email=%s", user.id, user.email)
     return TokenResponse(access_token=create_access_token(user.id))
 
 

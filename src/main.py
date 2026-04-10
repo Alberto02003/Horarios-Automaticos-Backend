@@ -1,10 +1,13 @@
 import os
+import time
+from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from src.core.config import settings
+from src.core.logging import logger
 from src.routes.auth import router as auth_router
 from src.routes.members import router as members_router
 from src.routes.shift_types import router as shift_types_router
@@ -13,9 +16,17 @@ from src.routes.schedule_periods import router as periods_router
 from src.routes.assignments import router as assignments_router
 from src.routes.generation import router as generation_router
 from src.routes.export import router as export_router
-import src.models  # noqa: F401 — register models with SQLAlchemy metadata
+import src.models  # noqa: F401
 
-app = FastAPI(title="Horarios Automaticos API", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Horarios Automaticos API started (log_level=%s)", settings.LOG_LEVEL)
+    yield
+    logger.info("Shutting down")
+
+
+app = FastAPI(title="Horarios Automaticos API", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -23,6 +34,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start = time.time()
+    response = await call_next(request)
+    duration = round((time.time() - start) * 1000)
+    if request.url.path != "/health":
+        logger.info("%s %s → %s (%dms)", request.method, request.url.path, response.status_code, duration)
+    return response
 
 
 app.include_router(auth_router)

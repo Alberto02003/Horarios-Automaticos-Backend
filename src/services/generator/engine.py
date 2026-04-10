@@ -1,6 +1,9 @@
 """Generation engine: loads data, runs strategy, saves results."""
 
+import logging
 from datetime import date
+
+log = logging.getLogger("horarios.generator")
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -110,7 +113,9 @@ async def run_generation(
         raise ValueError(f"Unknown strategy: {strategy_name}")
 
     strategy = strategy_cls()
+    log.info("Running %s strategy for period %d (%d members, %d dates, %d existing)", strategy_name, period_id, len(members), len(dates), len(existing))
     proposals = strategy.generate(ctx)
+    log.info("Strategy %s generated %d proposals", strategy_name, len(proposals))
 
     # Save assignments
     created_count = 0

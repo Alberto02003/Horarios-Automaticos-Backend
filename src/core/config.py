@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "dev-secret-key-change-in-production"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
     CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:5173"]
+    LOG_LEVEL: str = "info"
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 
