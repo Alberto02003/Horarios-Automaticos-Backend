@@ -13,12 +13,22 @@ class MemberInfo:
     allowed_shift_codes: frozenset[str] | None = None
     work_days: frozenset[int] | None = None  # weekday indices 0=Mon..6=Sun
     daily_hours: float | None = None
+    # 7-tuple of shift codes (e.g. "M", "T", "D") — one per weekday Mon..Sun.
+    # If set, the engine places exactly this code on each matching weekday and
+    # skips all other logic (coverage/consecutive/rest) for that member.
+    # Entries may be None to mean "engine decides" for that weekday.
+    weekly_pattern: tuple[str | None, ...] | None = None
 
     def eligible_day(self, d: date) -> bool:
         return self.work_days is None or d.weekday() in self.work_days
 
     def eligible_shift(self, shift_code: str) -> bool:
         return self.allowed_shift_codes is None or shift_code in self.allowed_shift_codes
+
+    def pattern_code_for(self, d: date) -> str | None:
+        if self.weekly_pattern is None:
+            return None
+        return self.weekly_pattern[d.weekday()]
 
     def hours_for(self, shift: "ShiftInfo") -> float:
         # If the member has a custom daily cap (e.g. 5h reducción taking an 8h shift),
@@ -65,6 +75,7 @@ class GenerationContext:
     members: list[MemberInfo]
     work_shifts: list[ShiftInfo]
     all_shifts: dict[int, ShiftInfo]  # All shifts by id (for hour lookup)
+    shifts_by_code: dict[str, ShiftInfo]  # shift_code -> ShiftInfo (for pattern lookup)
     rest_shift_id: int | None
     existing: list[ExistingAssignment]
     dates: list[date]

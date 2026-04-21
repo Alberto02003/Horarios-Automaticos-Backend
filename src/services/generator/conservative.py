@@ -40,6 +40,18 @@ class ConservativeStrategy(GenerationStrategy):
                 if key in assigned:
                     continue
 
+                # Pattern short-circuit
+                pcode = member.pattern_code_for(d)
+                if pcode is not None:
+                    pshift = ctx.shifts_by_code.get(pcode)
+                    if pshift is not None:
+                        proposals.append(ProposedAssignment(member.id, d, pshift.id))
+                        assigned.add(key)
+                        if pshift.counts_as_work_time:
+                            member_hours[member.id] += member.hours_for(pshift)
+                            member_last_work[member.id] = d
+                    continue
+
                 # Per-member work_days
                 if not member.eligible_day(d):
                     if ctx.rest_shift_id:

@@ -40,6 +40,17 @@ class CoverageStrategy(GenerationStrategy):
                 if key in locked_cells:
                     continue
 
+                # Pattern short-circuit
+                pcode = member.pattern_code_for(d)
+                if pcode is not None:
+                    pshift = ctx.shifts_by_code.get(pcode)
+                    if pshift is not None:
+                        proposals.append(ProposedAssignment(member.id, d, pshift.id))
+                        assigned[key] = pshift.id
+                        if pshift.counts_as_work_time:
+                            member_hours[member.id] += member.hours_for(pshift)
+                    continue
+
                 # Per-member work_days
                 if not member.eligible_day(d):
                     if ctx.rest_shift_id and key not in assigned:

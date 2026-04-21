@@ -62,6 +62,11 @@ async def run_generation(
         p = member_prefs.get(m.id, {})
         rotation = p.get("shift_rotation")
         wdays = p.get("work_days")
+        pattern = p.get("weekly_pattern")
+        if pattern and len(pattern) == 7:
+            weekly_pattern = tuple(x if x else None for x in pattern)
+        else:
+            weekly_pattern = None
         members.append(
             MemberInfo(
                 id=m.id,
@@ -70,6 +75,7 @@ async def run_generation(
                 allowed_shift_codes=frozenset(rotation) if rotation else None,
                 work_days=frozenset(wdays) if wdays is not None else None,
                 daily_hours=float(p["daily_hours"]) if p.get("daily_hours") else None,
+                weekly_pattern=weekly_pattern,
             )
         )
 
@@ -77,6 +83,7 @@ async def run_generation(
     shifts_result = await db.execute(select(ShiftType).where(ShiftType.is_active.is_(True)))
     all_shifts = list(shifts_result.scalars().all())
     all_shifts_map: dict[int, ShiftInfo] = {}
+    shifts_by_code: dict[str, ShiftInfo] = {}
     work_shifts: list[ShiftInfo] = []
     for s in all_shifts:
         si = ShiftInfo(
@@ -86,6 +93,7 @@ async def run_generation(
             hours=compute_shift_hours(s.default_start_time, s.default_end_time),
         )
         all_shifts_map[s.id] = si
+        shifts_by_code[s.code] = si
         if s.counts_as_work_time:
             work_shifts.append(si)
     rest_shift = next((s for s in all_shifts if s.code == "D"), None)
@@ -117,6 +125,7 @@ async def run_generation(
         members=members,
         work_shifts=work_shifts,
         all_shifts=all_shifts_map,
+        shifts_by_code=shifts_by_code,
         rest_shift_id=rest_shift.id if rest_shift else None,
         existing=existing,
         dates=dates,

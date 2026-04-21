@@ -51,6 +51,23 @@ class BalancedStrategy(GenerationStrategy):
                 if key in locked_cells:
                     continue
 
+                # Pattern short-circuit: if the member has a weekly_pattern, place
+                # exactly that shift on this weekday and skip all other logic. The
+                # human-designed pattern is the source of truth — we don't second-guess
+                # it with coverage/consecutive/rest checks.
+                pcode = member.pattern_code_for(d)
+                if pcode is not None:
+                    pshift = ctx.shifts_by_code.get(pcode)
+                    if pshift is not None:
+                        proposals.append(ProposedAssignment(member.id, d, pshift.id))
+                        assigned[key] = pshift.id
+                        if pshift.counts_as_work_time:
+                            member_hours[member.id] += member.hours_for(pshift)
+                            member_last_work[member.id] = d
+                            member_last_shift_id[member.id] = pshift.id
+                            day_shift_count[(d, pshift.id)] += 1
+                    continue
+
                 # Per-member work_days: if this weekday is outside the member's
                 # eligible days, rest. Takes precedence over allow_weekend_work.
                 if not member.eligible_day(d):
