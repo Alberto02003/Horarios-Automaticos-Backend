@@ -8,6 +8,24 @@ class MemberInfo:
     id: int
     full_name: str
     weekly_hour_limit: float
+    # Per-member rules from MemberGenerationPreference.preferences_jsonb.
+    # None means "no constraint" — preserves behaviour for members without a row.
+    allowed_shift_codes: frozenset[str] | None = None
+    work_days: frozenset[int] | None = None  # weekday indices 0=Mon..6=Sun
+    daily_hours: float | None = None
+
+    def eligible_day(self, d: date) -> bool:
+        return self.work_days is None or d.weekday() in self.work_days
+
+    def eligible_shift(self, shift_code: str) -> bool:
+        return self.allowed_shift_codes is None or shift_code in self.allowed_shift_codes
+
+    def hours_for(self, shift: "ShiftInfo") -> float:
+        # If the member has a custom daily cap (e.g. 5h reducción taking an 8h shift),
+        # count only their contracted daily hours against the weekly limit.
+        if self.daily_hours is not None and shift.counts_as_work_time:
+            return min(shift.hours, self.daily_hours)
+        return shift.hours
 
 
 @dataclass

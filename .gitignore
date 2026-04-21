@@ -10,3 +10,6 @@ wheels/
 # Virtual environments
 .venv
 
+# Source data files with PII (import via scripts/import_personal_mostrador.py)
+PERSONAL MOSTRADOR.xlsx
+*.xlsx

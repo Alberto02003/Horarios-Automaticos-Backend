@@ -15,12 +15,14 @@ class ConservativeStrategy(GenerationStrategy):
         member_hours: dict[int, float] = defaultdict(float)
         member_consecutive: dict[int, int] = defaultdict(int)
         member_last_work: dict[int, date | None] = {m.id: None for m in ctx.members}
+        members_by_id = {m.id: m for m in ctx.members}
 
         for ex in ctx.existing:
             assigned.add((ex.member_id, ex.date))
             st = ctx.all_shifts.get(ex.shift_type_id)
             if st and st.counts_as_work_time:
-                member_hours[ex.member_id] += st.hours
+                mem = members_by_id.get(ex.member_id)
+                member_hours[ex.member_id] += mem.hours_for(st) if mem else st.hours
                 member_last_work[ex.member_id] = ex.date
 
         proposals: list[ProposedAssignment] = []
@@ -36,6 +38,12 @@ class ConservativeStrategy(GenerationStrategy):
 
                 # ONLY fill unassigned slots
                 if key in assigned:
+                    continue
+
+                # Per-member work_days
+                if not member.eligible_day(d):
+                    if ctx.rest_shift_id:
+                        proposals.append(ProposedAssignment(member.id, d, ctx.rest_shift_id))
                     continue
 
                 # Skip weekends if not allowed
@@ -66,8 +74,8 @@ class ConservativeStrategy(GenerationStrategy):
                     member_last_work[member.id] = None
                     continue
 
-                # Filter by coverage constraints
-                eligible = ctx.work_shifts
+                # Filter by coverage constraints + per-member shift rotation
+                eligible = [s for s in ctx.work_shifts if member.eligible_shift(s.code)]
                 if ctx.shift_coverage:
                     day_counts: dict[int, int] = defaultdict(int)
                     for ex in ctx.existing:
@@ -92,7 +100,7 @@ class ConservativeStrategy(GenerationStrategy):
 
                 proposals.append(ProposedAssignment(member.id, d, shift.id))
                 assigned.add(key)
-                member_hours[member.id] += shift.hours
+                member_hours[member.id] += member.hours_for(shift)
                 member_last_work[member.id] = d
 
         return proposals

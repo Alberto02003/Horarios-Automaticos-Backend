@@ -14,6 +14,7 @@ class CoverageStrategy(GenerationStrategy):
         assigned: dict[tuple[int, date], int] = {}
         locked_cells: set[tuple[int, date]] = set()
         member_hours: dict[int, float] = defaultdict(float)
+        members_by_id = {m.id: m for m in ctx.members}
 
         for ex in ctx.existing:
             assigned[(ex.member_id, ex.date)] = ex.shift_type_id
@@ -21,7 +22,8 @@ class CoverageStrategy(GenerationStrategy):
                 locked_cells.add((ex.member_id, ex.date))
             st = ctx.all_shifts.get(ex.shift_type_id)
             if st and st.counts_as_work_time:
-                member_hours[ex.member_id] += st.hours
+                mem = members_by_id.get(ex.member_id)
+                member_hours[ex.member_id] += mem.hours_for(st) if mem else st.hours
 
         proposals: list[ProposedAssignment] = []
         total_days = len(ctx.dates)
@@ -36,6 +38,13 @@ class CoverageStrategy(GenerationStrategy):
                 if ctx.fill_unassigned_only and key in assigned:
                     continue
                 if key in locked_cells:
+                    continue
+
+                # Per-member work_days
+                if not member.eligible_day(d):
+                    if ctx.rest_shift_id and key not in assigned:
+                        proposals.append(ProposedAssignment(member.id, d, ctx.rest_shift_id))
+                        assigned[key] = ctx.rest_shift_id
                     continue
 
                 # Skip weekends if not allowed
@@ -61,7 +70,7 @@ class CoverageStrategy(GenerationStrategy):
                     if existing_shift:
                         shift_counts[existing_shift] += 1
 
-                eligible = ctx.work_shifts
+                eligible = [s for s in ctx.work_shifts if member.eligible_shift(s.code)]
                 if ctx.shift_coverage:
                     eligible = [s for s in eligible if not ctx.shift_coverage.get(s.id) or shift_counts.get(s.id, 0) < ctx.shift_coverage[s.id].max]
                     needs = [s for s in eligible if ctx.shift_coverage.get(s.id) and shift_counts.get(s.id, 0) < ctx.shift_coverage[s.id].min]
@@ -78,6 +87,6 @@ class CoverageStrategy(GenerationStrategy):
 
                 proposals.append(ProposedAssignment(member.id, d, best_shift.id))
                 assigned[key] = best_shift.id
-                member_hours[member.id] += best_shift.hours
+                member_hours[member.id] += member.hours_for(best_shift)
 
         return proposals

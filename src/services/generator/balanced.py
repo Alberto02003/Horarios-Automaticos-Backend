@@ -21,13 +21,16 @@ class BalancedStrategy(GenerationStrategy):
         # Track shift counts per day for coverage
         day_shift_count: dict[tuple[date, int], int] = defaultdict(int)  # (date, shift_id) -> count
 
+        members_by_id = {m.id: m for m in ctx.members}
+
         for ex in ctx.existing:
             assigned[(ex.member_id, ex.date)] = ex.shift_type_id
             if ex.is_locked:
                 locked_cells.add((ex.member_id, ex.date))
             st = ctx.all_shifts.get(ex.shift_type_id)
             if st and st.counts_as_work_time:
-                member_hours[ex.member_id] += st.hours
+                mem = members_by_id.get(ex.member_id)
+                member_hours[ex.member_id] += mem.hours_for(st) if mem else st.hours
                 member_last_work[ex.member_id] = ex.date
                 member_last_shift_id[ex.member_id] = ex.shift_type_id
                 day_shift_count[(ex.date, ex.shift_type_id)] += 1
@@ -46,6 +49,14 @@ class BalancedStrategy(GenerationStrategy):
                 if ctx.fill_unassigned_only and key in assigned:
                     continue
                 if key in locked_cells:
+                    continue
+
+                # Per-member work_days: if this weekday is outside the member's
+                # eligible days, rest. Takes precedence over allow_weekend_work.
+                if not member.eligible_day(d):
+                    if ctx.rest_shift_id and key not in assigned:
+                        proposals.append(ProposedAssignment(member.id, d, ctx.rest_shift_id))
+                        assigned[key] = ctx.rest_shift_id
                     continue
 
                 # Skip weekends if not allowed
@@ -95,6 +106,14 @@ class BalancedStrategy(GenerationStrategy):
                 else:
                     eligible = ctx.work_shifts
 
+                # Filter by member's allowed shift codes (e.g. "M 8 horas" only takes M)
+                eligible = [s for s in eligible if member.eligible_shift(s.code)]
+                if not eligible:
+                    if ctx.rest_shift_id and key not in assigned:
+                        proposals.append(ProposedAssignment(member.id, d, ctx.rest_shift_id))
+                        assigned[key] = ctx.rest_shift_id
+                    continue
+
                 # Filter by coverage max — exclude shifts that already hit max for this day
                 if ctx.shift_coverage:
                     eligible = [s for s in eligible if _under_max(ctx, d, s.id, day_shift_count)]
@@ -115,7 +134,7 @@ class BalancedStrategy(GenerationStrategy):
 
                 proposals.append(ProposedAssignment(member.id, d, shift.id))
                 assigned[key] = shift.id
-                member_hours[member.id] += shift.hours
+                member_hours[member.id] += member.hours_for(shift)
                 member_last_work[member.id] = d
                 member_last_shift_id[member.id] = shift.id
                 day_shift_count[(d, shift.id)] += 1

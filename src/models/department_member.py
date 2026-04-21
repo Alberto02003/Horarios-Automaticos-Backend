@@ -1,4 +1,4 @@
-from sqlalchemy import BigInteger, Boolean, CheckConstraint, Identity, Numeric, Text
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, Identity, Index, Numeric, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -14,8 +14,10 @@ class DepartmentMember(Base):
     weekly_hour_limit: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
     color_tag: Mapped[str] = mapped_column(Text, nullable=False, server_default="'#3B82F6'")
+    group_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     metadata_jsonb: Mapped[dict | None] = mapped_column(JSONB, server_default="{}")
 
     __table_args__ = (
         CheckConstraint("weekly_hour_limit > 0", name="ck_members_positive_hours"),
+        Index("ix_department_members_group_name", "group_name"),
     )

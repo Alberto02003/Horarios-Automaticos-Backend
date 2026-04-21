@@ -13,6 +13,7 @@ from src.models.shift_type import ShiftType
 from src.models.schedule_period import SchedulePeriod
 from src.models.schedule_assignment import ScheduleAssignment
 from src.models.generation_preference import GenerationPreference
+from src.models.member_generation_preference import MemberGenerationPreference
 from src.models.generation_run import GenerationRun
 from src.schemas.assignment import AssignmentCreate
 from src.services import assignment_service
@@ -44,10 +45,33 @@ async def run_generation(
     members_result = await db.execute(
         select(DepartmentMember).where(DepartmentMember.is_active.is_(True)).order_by(DepartmentMember.full_name)
     )
-    members = [
-        MemberInfo(id=m.id, full_name=m.full_name, weekly_hour_limit=float(m.weekly_hour_limit))
-        for m in members_result.scalars().all()
-    ]
+    member_rows = list(members_result.scalars().all())
+
+    # Load per-member rules from JSONB (shift_rotation, daily_hours, work_days)
+    member_prefs_result = await db.execute(
+        select(MemberGenerationPreference).where(
+            MemberGenerationPreference.member_id.in_([m.id for m in member_rows])
+        )
+    )
+    member_prefs: dict[int, dict] = {
+        p.member_id: (p.preferences_jsonb or {}) for p in member_prefs_result.scalars().all()
+    }
+
+    members: list[MemberInfo] = []
+    for m in member_rows:
+        p = member_prefs.get(m.id, {})
+        rotation = p.get("shift_rotation")
+        wdays = p.get("work_days")
+        members.append(
+            MemberInfo(
+                id=m.id,
+                full_name=m.full_name,
+                weekly_hour_limit=float(m.weekly_hour_limit),
+                allowed_shift_codes=frozenset(rotation) if rotation else None,
+                work_days=frozenset(wdays) if wdays is not None else None,
+                daily_hours=float(p["daily_hours"]) if p.get("daily_hours") else None,
+            )
+        )
 
     # Load shift types
     shifts_result = await db.execute(select(ShiftType).where(ShiftType.is_active.is_(True)))
